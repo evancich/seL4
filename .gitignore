@@ -33,3 +33,5 @@ manual/generated_markdown
 
 # Emacs backups
 *~
+*.d
+*.d
