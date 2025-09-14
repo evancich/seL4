@@ -708,8 +708,136 @@ add_custom_target(kernel_all_pp_wrapper DEPENDS kernel_all_pp.c)
 
 add_custom_target(kernel_theories DEPENDS ${theories_deps})
 
+# ===== Rust shim: compile kernel/rust/mem.rs and link into kernel.elf =====
+# Optional: pick a Rust target triple based on configured arch
+if(KernelSel4ArchX86_64)
+    set(RUST_TARGET "x86_64-unknown-none")
+elseif(KernelSel4ArchAarch64)
+    set(RUST_TARGET "aarch64-unknown-none")
+else()
+    # Fallback (tune if you add other arches)
+    set(RUST_TARGET "x86_64-unknown-none")
+endif()
+
+# Path to rustc (allow override via environment)
+if(NOT DEFINED RUSTC)
+    set(RUSTC "$ENV{RUSTC}")
+    if(NOT RUSTC)
+        set(RUSTC rustc)
+    endif()
+endif()
+
+# Rust source (create this file at kernel/rust/mem.rs)
+set(KERNEL_RUST_RS ${CMAKE_CURRENT_SOURCE_DIR}/rust/mem.rs)
+set(KERNEL_RUST_O  ${CMAKE_CURRENT_BINARY_DIR}/mem.o)
+
+# Only build/link if the Rust source exists, so CMake stays tolerant
+if(EXISTS ${KERNEL_RUST_RS})
+    add_custom_command(
+        OUTPUT ${KERNEL_RUST_O}
+        COMMAND ${RUSTC}
+                --crate-type staticlib
+                --target ${RUST_TARGET}
+                -C panic=abort
+                -C lto=no
+                -C opt-level=z
+                --emit=obj
+                -o ${KERNEL_RUST_O}
+                ${KERNEL_RUST_RS}
+        DEPENDS ${KERNEL_RUST_RS}
+        COMMENT "Compiling kernel Rust shim: ${KERNEL_RUST_RS}"
+        VERBATIM
+    )
+
+    # Object library so we can link the .o into kernel.elf cleanly
+endif()
+# ======================================================================
+
+
 # Declare final kernel output
 add_executable(kernel.elf EXCLUDE_FROM_ALL ${asm_sources} kernel_all.c)
+# ===== Rust shim: compile kernel/rust/mem.rs and add its .o to kernel.elf =====
+
+if(KernelSel4ArchX86_64)
+
+    set(RUST_TARGET "x86_64-unknown-none")
+
+elseif(KernelSel4ArchAarch64)
+
+    set(RUST_TARGET "aarch64-unknown-none")
+
+else()
+
+    set(RUST_TARGET "x86_64-unknown-none")
+
+endif()
+
+
+
+if(NOT DEFINED RUSTC)
+
+    set(RUSTC "$ENV{RUSTC}")
+
+    if(NOT RUSTC)
+
+        set(RUSTC rustc)
+
+    endif()
+
+endif()
+
+
+
+set(KERNEL_RUST_RS ${CMAKE_CURRENT_SOURCE_DIR}/rust/mem.rs)
+
+set(KERNEL_RUST_O  ${CMAKE_CURRENT_BINARY_DIR}/mem.o)
+
+
+
+if(EXISTS ${KERNEL_RUST_RS})
+
+    add_custom_command(
+
+        OUTPUT ${KERNEL_RUST_O}
+
+        COMMAND ${RUSTC}
+
+                --crate-type staticlib
+
+                --target ${RUST_TARGET}
+
+                -C panic=abort
+
+                -C lto=no
+
+                -C opt-level=z
+
+                --emit=obj
+
+                -o ${KERNEL_RUST_O}
+
+                ${KERNEL_RUST_RS}
+
+        DEPENDS ${KERNEL_RUST_RS}
+
+        COMMENT "Compiling kernel Rust shim: ${KERNEL_RUST_RS}"
+
+        VERBATIM
+
+    )
+
+
+
+    add_custom_target(kernel_rust_obj ALL DEPENDS ${KERNEL_RUST_O})
+
+    target_sources(kernel.elf PRIVATE ${KERNEL_RUST_O})
+
+endif()
+
+# =======================================================================
+# Link the Rust object if it was created
+if(TARGET kernel_mem_obj)
+endif()
 target_include_directories(kernel.elf PRIVATE ${config_dir})
 target_include_directories(kernel.elf PRIVATE include)
 target_include_directories(kernel.elf PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
