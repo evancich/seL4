@@ -14,3 +14,5 @@ pub unsafe extern "C" fn memclr(dst: *mut core::ffi::c_void, n: usize) {
     if n == 0 { return; }
     ptr::write_bytes(dst as *mut u8, 0xAAu8, n);
 }
+
+// touch: 2025-09-16T02:00:17+00:00
